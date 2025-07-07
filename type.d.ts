@@ -1,3 +1,5 @@
+import { Models } from "react-native-appwrite";
+
 export interface CustomInputProps {
     placeholder?: string;
     value?: string;
@@ -14,4 +16,21 @@ export interface CustomButtonProps {
     leftIcon?: React.ReactNode;
     textStyle?: string;
     isLoading?: boolean;
+}
+
+export interface CreateUserPrams {
+    email: string;
+    password: string;
+    name: string;
+}
+
+export interface SignInParams {
+    email: string;
+    password: string;
+}
+
+export interface User extends Models.Document {
+    name: string;
+    email: string;
+    avatar: string;
 }

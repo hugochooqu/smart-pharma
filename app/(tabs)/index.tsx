@@ -1,34 +1,46 @@
 import { colors, quickNav } from "@/constants";
-import { FlatList, Pressable, Text, TouchableWithoutFeedback, View } from "react-native";
+import {
+  Button,
+  FlatList,
+  Image,
+  Pressable,
+  Text,
+  TouchableWithoutFeedback,
+  View,
+} from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
-import { Fragment } from "react";
 import { useRouter } from "expo-router";
+import useAuthStore from "@/store/auth.store";
 
 export default function Index() {
+  const {user} = useAuthStore();
+  console.log('User:', JSON.stringify(user, null, 2) )
 
-  const router = useRouter()
+  const router = useRouter();
+
   const QuickActionCard = ({ id, title, subtitle, icon, color }: any) => {
     return (
       <Pressable className="flex-1 m-2 p-5 bg-white rounded-xl shadow-lg shadow-slate-600 items-center justify-center">
-  {({ pressed }) => (
-    <TouchableWithoutFeedback onPress={() => router.push('/(tabs)/symptoms')}>
-      <View className="items-center justify-center">
-        <View
-          className="w-16 h-16 rounded-full justify-center items-center mb-3"
-          style={{ backgroundColor: color, opacity: pressed ? 0.8 : 1 }}
-        >
-          <Ionicons name={icon} size={24} color="white" />
-        </View>
-        <Text className="text-gray-900 font-bold text-lg text-center">
-          {title}
-        </Text>
-        <Text className="text-gray-700 text-center">{subtitle}</Text>
-      </View>
-    </TouchableWithoutFeedback>
-  )}
-</Pressable>
-
+        {({ pressed }) => (
+          <TouchableWithoutFeedback
+            onPress={() => router.push("/(tabs)/symptoms")}
+          >
+            <View className="items-center justify-center">
+              <View
+                className="w-16 h-16 rounded-full justify-center items-center mb-3"
+                style={{ backgroundColor: color, opacity: pressed ? 0.8 : 1 }}
+              >
+                <Ionicons name={icon} size={24} color="white" />
+              </View>
+              <Text className="text-gray-900 font-bold text-lg text-center">
+                {title}
+              </Text>
+              <Text className="text-gray-700 text-center">{subtitle}</Text>
+            </View>
+          </TouchableWithoutFeedback>
+        )}
+      </Pressable>
     );
   };
 
@@ -51,8 +63,8 @@ export default function Index() {
         ListHeaderComponent={() => (
           <View>
             <View className="px-4 pt-6 pb-2 flex flex-row justify-between">
-              <Text className=" text-3xl font-semibold">Hello user</Text>
-              <Text className=" text-3xl font-semibold">Profile pics</Text>
+              <Text className=" text-3xl font-semibold">Hello {user?.name}</Text>
+              <Image source={user?.avatar ? {uri: user.avatar} : undefined} className="size-10 rounded-full" resizeMode="contain" />
             </View>
             <Text className="px-4 text-lg font-semibold text-gray-400">
               Let&apos;s take care of your health today

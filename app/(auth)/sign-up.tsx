@@ -3,6 +3,7 @@ import React, { useState } from "react";
 import { Link, router } from "expo-router";
 import CustomInput from "@/components/CustomInput";
 import CustomButton from "@/components/CustomButton";
+import { createUser } from "@/lib/appwrite";
 
 
 const SignUp = () => {
@@ -21,9 +22,9 @@ const SignUp = () => {
     setIsSubmitting(true);
 
     try {
-        // await signIn({ email, password });
+      await createUser({email, password, name});
 
-        // router.replace('/');
+        router.replace('/');
     } catch(error: any) {
         Alert.alert('Error', error.message);
         // Sentry.captureEvent(error);
