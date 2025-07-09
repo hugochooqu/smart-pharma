@@ -34,3 +34,33 @@ export interface User extends Models.Document {
     email: string;
     avatar: string;
 }
+
+type ReminderConfig = {
+  drugId: string;
+  timesPerDay: number;
+  times: string[]; // e.g. ['08:00', '14:00']
+  durationDays: number;
+  note?: string;
+};
+
+
+export interface ReccomendationParams {
+    userId: string;
+  symptoms: string[];
+  customSymptoms: string;
+  recommendations: string;
+}
+
+type HerbalRecommendation = {
+  herb: string;
+  effect: string;
+  dosage: string;
+};
+
+type RecommendationHistory = {
+  id: string;
+  symptoms: any;
+  customSymptoms: any;
+  createdAt: any;
+  recommendation: any;
+};

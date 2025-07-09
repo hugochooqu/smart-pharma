@@ -1,10 +1,12 @@
 import {SplashScreen, Stack} from "expo-router";
 import { useFonts } from 'expo-font';
 import { useEffect} from "react";
+import * as Notifications from 'expo-notifications';
 
 import './global.css';
 import * as Sentry from '@sentry/react-native';
 import useAuthStore from "@/store/auth.store";
+import { registerForPushNotificationsAsync } from "@/utils/notifications";
 
 Sentry.init({
   dsn: 'https://4a6840595bc6e27c282090b9b4570e45@o4508299493179392.ingest.de.sentry.io/4509629506060368',
@@ -42,6 +44,11 @@ export default Sentry.wrap(function RootLayout() {
   useEffect(() => {
     fetchAuthenticatedUser()
   }, [])
+
+useEffect(() => {
+  registerForPushNotificationsAsync()
+}, []);
+
   
   if(!fontsLoaded || isLoading ) return null;
 

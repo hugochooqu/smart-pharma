@@ -1,4 +1,6 @@
-import { CreateUserPrams, SignInParams } from '@/type';
+import useAuthStore from '@/store/auth.store';
+import { CreateUserPrams, HerbalRecommendation, ReccomendationParams, SignInParams } from '@/type';
+import { parseRecommendation } from '@/utils/recomendations';
 import {Account, Avatars, Client, Databases, ID, Query} from 'react-native-appwrite'
 
 export const appwriteConfig = {
@@ -6,7 +8,8 @@ export const appwriteConfig = {
     platform: "com.crown.smartpharma", 
     projectId: process.env.EXPO_PUBLIC_APPWRITE_PROJECT_ID,
     databaseId: '686c0fe60000aebacaea',
-    userCollectionId: '686c10240013756c46dc'
+    userCollectionId: '686c10240013756c46dc',
+    recommendationsCollectionId: '686d4e810008572ad031'
 }
 
 export const client = new Client()
@@ -73,4 +76,53 @@ export const getCurrentUser= async() => {
         console.log(error)
         throw new Error(error as string)
     }
+}
+
+export const saveRecommendations = async ({
+  userId,
+  symptoms,
+  customSymptoms,
+  recommendations,
+}: ReccomendationParams) => {
+
+    return await databases.createDocument(
+        appwriteConfig.databaseId,
+        appwriteConfig.recommendationsCollectionId,
+        ID.unique(),
+        {
+            userId,
+            symptoms,
+            customSymptoms,
+            recommendations,
+            createdAt: new Date().toISOString(),
+        }
+    )
+
+}
+
+export async function fetchUserRecommendations(userId: string) {
+  try {
+    const response = await databases.listDocuments(
+      appwriteConfig.databaseId,
+      appwriteConfig.recommendationsCollectionId,
+      [Query.equal('userId', userId)]
+    );
+
+    const formatted = response.documents.map((doc) => {
+      
+
+      return {
+        id: doc.$id,
+        symptoms: doc.symptoms,
+        customSymptoms: doc.customSymptoms,
+        createdAt: doc.createdAt,
+        recommendation: JSON.parse(doc.recommendations) as HerbalRecommendation[],
+      };
+    });
+
+    return formatted;
+  } catch (error) {
+    console.error('❌ Error fetching recommendations:', error);
+    return [];
+  }
 }
