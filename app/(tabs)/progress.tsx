@@ -28,9 +28,7 @@ export default function ProgressScreen() {
   const { theme } = useThemeContext();
   const { user } = useAuthStore();
 
-  const [selectedPeriod, setSelectedPeriod] = useState<"week" | "month">(
-    "week"
-  );
+  const [selectedPeriod, setSelectedPeriod] = useState<"week" | "month">("week");
   const [dosesTaken, setDosesTaken] = useState(0);
   const [dosesExpected, setDosesExpected] = useState(0);
   const [adherenceRate, setAdherenceRate] = useState(0);
@@ -46,76 +44,74 @@ export default function ProgressScreen() {
 
   useEffect(() => {
     const computeProgress = async () => {
-      if (!user) return;
+      if (!user?.$id) return;
 
-      const reminders = await fetchRemindersForRecommendation(user.$id);
-      const logs = await fetchIntakeLogs(user.$id);
+      try {
+        const reminders = await fetchRemindersForRecommendation(user.$id) || [];
+        const logs = await fetchIntakeLogs(user.$id) || [];
 
-      const today = new Date();
-      const last7Days = [...Array(7)].map((_, i) => {
-        const d = new Date();
-        d.setDate(today.getDate() - i);
-        d.setHours(0, 0, 0, 0);
-        return d;
-      });
-
-      let totalTaken = 0;
-      let totalExpected = 0;
-      let streakCounter = 0;
-
-      for (const day of last7Days) {
-        const dayStart = new Date(day);
-        dayStart.setHours(0, 0, 0, 0);
-
-        const dayEnd = new Date(day);
-        dayEnd.setHours(23, 59, 59, 999);
-
-        // Filter logs taken on this day
-        const logsForDay = logs.filter((log: any) => {
-          const takenAt = new Date(log.takenAt);
-          return takenAt >= dayStart && takenAt <= dayEnd;
+        const today = new Date();
+        const last7Days = [...Array(7)].map((_, i) => {
+          const d = new Date();
+          d.setDate(today.getDate() - i);
+          d.setHours(0, 0, 0, 0);
+          return d;
         });
 
-        // Calculate expected doses for this day
-        let expectedForDay = 0;
-        for (const rem of reminders) {
-          const remStartLocal = new Date(rem.startDate);
-          remStartLocal.setHours(0, 0, 0, 0);
+        let totalTaken = 0;
+        let totalExpected = 0;
+        let streakCounter = 0;
 
-          const remEndLocal = new Date(rem.startDate);
-          remEndLocal.setDate(
-            remEndLocal.getDate() + Number(rem.durationDays) - 1
-          );
-          remEndLocal.setHours(23, 59, 59, 999);
+        for (const day of last7Days) {
+          const dayStart = new Date(day);
+          const dayEnd = new Date(day);
+          dayEnd.setHours(23, 59, 59, 999);
 
-          const isActive = dayStart >= remStartLocal && dayStart <= remEndLocal;
-          if (isActive) {
-            expectedForDay += Number(rem.frequencyPerDay || 0);
+          const logsForDay = logs.filter((log: any) => {
+            const takenAt = log?.takenAt ? new Date(log.takenAt) : null;
+            return takenAt && takenAt >= dayStart && takenAt <= dayEnd;
+          });
+
+          let expectedForDay = 0;
+          for (const rem of reminders) {
+            if (!rem?.startDate || !rem?.durationDays || !rem?.frequencyPerDay) continue;
+
+            const remStart = new Date(rem.startDate);
+            remStart.setHours(0, 0, 0, 0);
+
+            const remEnd = new Date(rem.startDate);
+            remEnd.setDate(remEnd.getDate() + Number(rem.durationDays) - 1);
+            remEnd.setHours(23, 59, 59, 999);
+
+            const isActive = dayStart >= remStart && dayStart <= remEnd;
+            if (isActive) {
+              expectedForDay += Number(rem.frequencyPerDay || 0);
+            }
+          }
+
+          totalTaken += logsForDay.length;
+          totalExpected += expectedForDay;
+
+          if (expectedForDay > 0 && logsForDay.length >= expectedForDay) {
+            streakCounter += 1;
+          } else {
+            break;
           }
         }
 
-        totalTaken += logsForDay.length;
-        totalExpected += expectedForDay;
-
-        console.log("ed", expectedForDay);
-
-        if (expectedForDay > 0 && logsForDay.length >= expectedForDay) {
-          streakCounter += 1;
-        } else {
-          break;
-        }
+        setDosesTaken(totalTaken);
+        setDosesExpected(totalExpected);
+        setAdherenceRate(
+          totalExpected > 0 ? Math.round((totalTaken / totalExpected) * 100) : 0
+        );
+        setStreak(streakCounter);
+      } catch (error) {
+        console.error("❌ Error computing progress:", error);
       }
-
-      setDosesTaken(totalTaken);
-      setDosesExpected(totalExpected);
-      setAdherenceRate(
-        totalExpected > 0 ? Math.round((totalTaken / totalExpected) * 100) : 0
-      );
-      setStreak(streakCounter);
     };
 
     computeProgress();
-  }, []);
+  }, [user?.$id]);
 
   const fadeStyle = useAnimatedStyle(() => ({ opacity: fadeAnim.value }));
   const slideStyle = useAnimatedStyle(() => ({
@@ -135,10 +131,7 @@ export default function ProgressScreen() {
         className="w-[47%] mb-4 rounded-xl bg-white dark:bg-neutral-800 shadow"
         activeOpacity={0.9}
       >
-        <Animated.View
-          style={animatedStyle}
-          className="flex-row items-center p-4"
-        >
+        <Animated.View style={animatedStyle} className="flex-row items-center p-4">
           <View
             className={`w-10 h-10 rounded-full mr-3 justify-center items-center`}
             style={{ backgroundColor: color }}
@@ -146,54 +139,44 @@ export default function ProgressScreen() {
             <Ionicons name={icon} size={20} color="white" />
           </View>
           <View className="flex-1">
-            <Text className="text-lg font-bold text-black dark:text-white">
-              {value}
-            </Text>
+            <Text className="text-lg font-bold text-black dark:text-white">{value}</Text>
             <Text className="text-sm font-semibold text-gray-800 dark:text-gray-200">
               {title}
             </Text>
-            <Text className="text-xs text-gray-500 dark:text-gray-400">
-              {subtitle}
-            </Text>
+            <Text className="text-xs text-gray-500 dark:text-gray-400">{subtitle}</Text>
           </View>
         </Animated.View>
       </TouchableOpacity>
     );
   };
 
-  const PeriodSelector = () => {
-    return (
-      <View className="flex-row mb-4">
-        {["week", "month"].map((period) => (
-          <TouchableOpacity
-            key={period}
-            onPress={() => setSelectedPeriod(period as "week" | "month")}
-            className={`flex-1 mx-1 py-2 rounded-full items-center ${
-              selectedPeriod === period
-                ? "bg-blue-600"
-                : "bg-gray-200 dark:bg-gray-700"
+  const PeriodSelector = () => (
+    <View className="flex-row mb-4">
+      {["week", "month"].map((period) => (
+        <TouchableOpacity
+          key={period}
+          onPress={() => setSelectedPeriod(period as "week" | "month")}
+          className={`flex-1 mx-1 py-2 rounded-full items-center ${
+            selectedPeriod === period ? "bg-blue-600" : "bg-gray-200 dark:bg-gray-700"
+          }`}
+        >
+          <Text
+            className={`text-sm font-semibold ${
+              selectedPeriod === period ? "text-white" : "text-black dark:text-white"
             }`}
           >
-            <Text
-              className={`text-sm font-semibold ${
-                selectedPeriod === period
-                  ? "text-white"
-                  : "text-black dark:text-white"
-              }`}
-            >
-              {period === "week" ? "Week" : "Month"}
-            </Text>
-          </TouchableOpacity>
-        ))}
-      </View>
-    );
-  };
+            {period === "week" ? "Week" : "Month"}
+          </Text>
+        </TouchableOpacity>
+      ))}
+    </View>
+  );
 
   const lineChartData = {
     labels: ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"],
     datasets: [
       {
-        data: [5, 6, 4, 3, 2, 3, 2], // Symptom severity: lower is better
+        data: [5, 6, 4, 3, 2, 3, 2].map((d) => isNaN(d) ? 0 : d),
         color: () => "#3b82f6",
         strokeWidth: 2,
       },
@@ -213,18 +196,14 @@ export default function ProgressScreen() {
   };
 
   return (
-          
     <ScrollView className="flex-1 bg-white dark:bg-slate-900 px-4 pt-10" contentContainerStyle={{ paddingBottom: 120 }}>
       <Animated.View style={fadeStyle}>
-        <Text className="text-2xl font-bold mb-1 text-black dark:text-white">
-          Your Health Progress
-        </Text>
+        <Text className="text-2xl font-bold mb-1 text-black dark:text-white">Your Health Progress</Text>
         <Text className="text-base text-gray-600 dark:text-gray-400 mb-6">
           Track your symptoms and medication adherence
         </Text>
       </Animated.View>
 
-      {/* Progress Cards */}
       <Animated.View style={slideStyle}>
         <Text className="text-lg font-semibold text-black dark:text-white mb-4">
           This Week's Overview
@@ -232,14 +211,14 @@ export default function ProgressScreen() {
         <View className="flex-row flex-wrap justify-between">
           <ProgressCard
             title="Doses Taken"
-            value={`${dosesTaken}/${dosesExpected}`}
-            subtitle={`${adherenceRate}% adherence`}
+            value={`${dosesTaken ?? 0}/${dosesExpected ?? 0}`}
+            subtitle={`${isNaN(adherenceRate) ? 0 : adherenceRate}% adherence`}
             icon="checkmark-circle"
             color="#22c55e"
           />
           <ProgressCard
             title="Days Streak"
-            value={streak}
+            value={streak ?? 0}
             subtitle={streak >= 7 ? "Perfect week!" : `${streak} day streak`}
             icon="flame"
             color="#f59e0b"
@@ -261,7 +240,6 @@ export default function ProgressScreen() {
         </View>
       </Animated.View>
 
-      {/* Chart Placeholder */}
       <Animated.View style={slideStyle} className="mt-6">
         <Text className="text-lg font-semibold text-black dark:text-white mb-4">
           Symptom Severity Trend
@@ -270,13 +248,11 @@ export default function ProgressScreen() {
         <View className="rounded-xl overflow-hidden bg-white dark:bg-neutral-800 p-2">
           <LineChart
             data={lineChartData}
-            width={width - 48} // padding: px-4
+            width={width - 48}
             height={220}
             chartConfig={chartConfig}
             bezier
-            style={{
-              borderRadius: 16,
-            }}
+            style={{ borderRadius: 16 }}
           />
         </View>
       </Animated.View>
@@ -295,9 +271,7 @@ export default function ProgressScreen() {
         </View>
       </Animated.View>
 
-      {/* AI Insight */}
       <Animated.View style={slideStyle} className="mt-8 mb-16">
-        
         <HealthTipCard />
       </Animated.View>
     </ScrollView>
