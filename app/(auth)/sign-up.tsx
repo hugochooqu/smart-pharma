@@ -1,13 +1,16 @@
-import { View, Text, Button, Alert } from "react-native";
+import { View, Text, Button, Alert, Pressable } from "react-native";
 import React, { useState } from "react";
 import { Link, router } from "expo-router";
 import CustomInput from "@/components/CustomInput";
 import CustomButton from "@/components/CustomButton";
 import { createUser } from "@/lib/appwrite";
+import { Ionicons } from "@expo/vector-icons";
 
 
 const SignUp = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
+    const [showPassword, setShowPassword] = useState(false);
+  
   const [form, setForm] = useState({name: "", email: "", password: "" });
 
   const submit = async () => {
@@ -49,12 +52,21 @@ const SignUp = () => {
         keyboardType="email-address"
       />
       <CustomInput
-        placeholder="Enter your password"
-        value={form.password}
-        onChangeText={(text) => setForm((prev) => ({ ...prev, password: text}))}
-        label="Password"
-        secureTextEntry={true}
+  placeholder="Enter your password"
+  value={form.password}
+  onChangeText={(text) => setForm((prev) => ({ ...prev, password: text }))}
+  label="Password"
+  secureTextEntry={!showPassword}
+  rightIcon={
+    <Pressable onPress={() => setShowPassword(!showPassword)}>
+      <Ionicons
+        name={showPassword ? "eye-off" : "eye"}
+        size={22}
+        color="#3B82F6"
       />
+    </Pressable>
+  }
+/>
       <CustomButton title="Sign Up" isLoading={isSubmitting} onPress={submit} />
 
       <View className="flex justify-center mt-5 flex-row gap-2">

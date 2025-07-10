@@ -19,20 +19,12 @@ import Animated, {
 import useAuthStore from "@/store/auth.store";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useThemeContext } from "@/context/ThemeContext";
-import * as LocalAuthentication from "expo-local-authentication";
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import { router } from "expo-router";
-
-// import { theme } from '../theme/theme'; // Optional, used only for colors
 
 const ProfileScreen = () => {
   const [notifications, setNotifications] = useState(true);
-  const [biometrics, setBiometrics] = useState(true);
-  const [biometricSupported, setBiometricSupported] = useState(false);
-
   const { theme, setTheme } = useThemeContext();
-
-  const { user } = useAuthStore();
+  const { user, logout } = useAuthStore();
 
   const fadeAnim = useSharedValue(0);
   const slideAnim = useSharedValue(30);
@@ -40,15 +32,6 @@ const ProfileScreen = () => {
   useEffect(() => {
     fadeAnim.value = withTiming(1, { duration: 800 });
     slideAnim.value = withSpring(0);
-  }, []);
-
-  useEffect(() => {
-    const checkSupport = async () => {
-      const compatible = await LocalAuthentication.hasHardwareAsync();
-      const enrolled = await LocalAuthentication.isEnrolledAsync();
-      setBiometricSupported(compatible && enrolled);
-    };
-    checkSupport();
   }, []);
 
   const fadeStyle = useAnimatedStyle(() => ({
@@ -99,7 +82,6 @@ const ProfileScreen = () => {
     icon,
     value,
     onValueChange,
-    type = "switch",
   }: any) => {
     const scaleAnim = useSharedValue(1);
     const animatedStyle = useAnimatedStyle(() => ({
@@ -127,19 +109,12 @@ const ProfileScreen = () => {
               {subtitle}
             </Text>
           </View>
-          {type === "switch" ? (
-            <Switch
-              value={value}
-              onValueChange={onValueChange}
-              trackColor={{
-                false: "#ccc",
-                true: "#3B82F6",
-              }}
-              thumbColor={value ? "white" : "#999"}
-            />
-          ) : (
-            <Ionicons name="chevron-forward" size={20} color="#aaa" />
-          )}
+          <Switch
+            value={value}
+            onValueChange={onValueChange}
+            trackColor={{ false: "#ccc", true: "#3B82F6" }}
+            thumbColor={value ? "white" : "#999"}
+          />
         </Animated.View>
       </TouchableOpacity>
     );
@@ -151,7 +126,11 @@ const ProfileScreen = () => {
       style={{ flex: 1 }}
     >
       <SafeAreaView className="flex-1 bg-white dark:bg-slate-900">
-        <ScrollView className="flex-1 bg-gray-100 dark:bg-slate-900 px-4 pt-12">
+        <ScrollView
+          className="flex-1 px-4 pt-12 bg-white dark:bg-slate-900"
+          contentContainerStyle={{ paddingBottom: 120 }} // ✅ prevents hiding under tab
+          showsVerticalScrollIndicator={false}
+        >
           {/* Header */}
           <Animated.View style={fadeStyle}>
             <View className="flex-row items-center mb-6">
@@ -166,7 +145,7 @@ const ProfileScreen = () => {
                   {user?.email}
                 </Text>
                 <Text className="text-sm text-neutral-500 dark:text-neutral-400">
-                  {`${user?.age} yrs • ${user?.weight} kg • ${user?.height} cm`}
+                  {`${user?.age || 0} yrs • ${user?.weight || 0} kg • ${user?.height || 0} cm`}
                 </Text>
               </View>
             </View>
@@ -196,7 +175,7 @@ const ProfileScreen = () => {
             ))}
           </Animated.View>
 
-          {/* Profile Cards */}
+          {/* Profile Section */}
           <Animated.View style={slideStyle}>
             <Text className="text-lg font-semibold text-neutral-900 dark:text-white mb-4">
               Profile
@@ -207,21 +186,21 @@ const ProfileScreen = () => {
               icon="person-outline"
               onPress={() => router.push("/edit-profile")}
             />
-            <ProfileCard
+            {/* <ProfileCard
               title="Medical History"
               subtitle="View health records"
               icon="medical-outline"
             />
             <ProfileCard
               title="Allergies"
-              subtitle="Manage your sensitivities"
+              subtitle="Manage sensitivities"
               icon="warning-outline"
             />
             <ProfileCard
               title="Emergency Contacts"
               subtitle="Set emergency numbers"
               icon="call-outline"
-            />
+            /> */}
           </Animated.View>
 
           {/* Settings */}
@@ -241,68 +220,64 @@ const ProfileScreen = () => {
               subtitle="Toggle theme"
               icon="moon-outline"
               value={theme === "dark"}
-              onValueChange={(value: string) =>
+              onValueChange={(value: boolean) =>
                 setTheme(value ? "dark" : "light")
               }
             />
-            <SettingItem
-              title="Biometric Login"
-              subtitle="Use fingerprint/Face ID"
-              icon="finger-print-outline"
-              value={biometrics}
-              onValueChange={async (enabled: boolean) => {
-                if (!biometricSupported) {
-                  Alert.alert(
-                    "Not Supported",
-                    "Your device does not support biometrics."
-                  );
-                  return;
-                }
+          </Animated.View>
 
-                if (enabled) {
-                  const result = await LocalAuthentication.authenticateAsync({
-                    promptMessage: "Enable Biometric Authentication",
-                    fallbackLabel: "Use Passcode",
-                  });
-
-                  if (result.success) {
-                    setBiometrics(true);
-                    await AsyncStorage.setItem("biometric_enabled", "true");
-                    Alert.alert("Enabled", "Biometric login has been enabled.");
-                  } else {
-                    Alert.alert("Failed", "Biometric authentication failed.");
-                  }
-                } else {
-                  setBiometrics(false);
-                  await AsyncStorage.removeItem("biometric_enabled");
-                  Alert.alert("Disabled", "Biometric login has been disabled.");
-                }
-              }}
-            />
-
-            <SettingItem
-              title="Privacy & Security"
-              subtitle="Manage data and access"
-              icon="shield-outline"
-              type="navigate"
-            />
-            <SettingItem
+          {/* Help & Legal */}
+          <Animated.View style={slideStyle} className="mt-6">
+            <Text className="text-lg font-semibold text-neutral-900 dark:text-white mb-4">
+              Info
+            </Text>
+            <ProfileCard
               title="Help & Support"
-              subtitle="Contact support"
+              subtitle="Reach out for assistance"
               icon="help-circle-outline"
-              type="navigate"
+              onPress={() => router.push("/helpScreen")}
             />
-            <SettingItem
+            <ProfileCard
+              title="Privacy Policy"
+              subtitle="How we handle your data"
+              icon="shield-outline"
+              onPress={() => router.push("/privacyPolicyScreen")}
+            />
+            <ProfileCard
               title="About SmartPharma"
               subtitle="Version 1.0.0"
               icon="information-circle-outline"
-              type="navigate"
+              onPress={() => router.push("/about")}
             />
           </Animated.View>
 
-          {/* Logout Button */}
+          {/* Logout */}
+
           <Animated.View style={slideStyle} className="my-8">
-            <TouchableOpacity className="bg-red-600 py-4 rounded-xl items-center flex-row justify-center">
+            <TouchableOpacity
+              onPress={() =>
+                Alert.alert(
+                  "Confirm Logout",
+                  "Are you sure you want to log out?",
+                  [
+                    {
+                      text: "Cancel",
+                      style: "cancel",
+                    },
+                    {
+                      text: "Logout",
+                      style: "destructive",
+                      onPress: async () => {
+                        await logout();
+                        router.replace("/sign-in");
+                      },
+                    },
+                  ],
+                  { cancelable: true }
+                )
+              }
+              className="bg-red-600 py-4 rounded-xl items-center flex-row justify-center"
+            >
               <Ionicons name="log-out-outline" size={20} color="white" />
               <Text className="text-white font-semibold text-base ml-2">
                 Log Out

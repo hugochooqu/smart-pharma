@@ -61,6 +61,8 @@ export const signIn = async ({email, password}: SignInParams ) => {
 } 
 
 
+
+
 export const getCurrentUser= async() => {
     try {
         const currentAccount = await account.get()
@@ -249,10 +251,12 @@ export const saveIntakeLog = async ({
   userId,
   reminderId,
   recommendationId,
+  timeIndex
 }: {
   userId: string;
   reminderId: string;
   recommendationId: string;
+  timeIndex: number;
 }) => {
   return await databases.createDocument(
     appwriteConfig.databaseId,
@@ -263,6 +267,7 @@ export const saveIntakeLog = async ({
       reminderId,
       recommendationId,
       takenAt: new Date().toISOString(),
+      timeIndex
     }
   );
 };

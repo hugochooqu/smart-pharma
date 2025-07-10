@@ -21,6 +21,7 @@ import {
 } from "@/lib/appwrite";
 import useAuthStore from "@/store/auth.store";
 import HealthTipCard from "@/components/HealthTipCard";
+import { SafeAreaView } from "react-native-safe-area-context";
 
 const { width } = Dimensions.get("window");
 
@@ -196,6 +197,7 @@ export default function ProgressScreen() {
   };
 
   return (
+    <SafeAreaView className="flex-1 bg-white dark:bg-slate-900">
     <ScrollView className="flex-1 bg-white dark:bg-slate-900 px-4 pt-10" contentContainerStyle={{ paddingBottom: 120 }}>
       <Animated.View style={fadeStyle}>
         <Text className="text-2xl font-bold mb-1 text-black dark:text-white">Your Health Progress</Text>
@@ -275,5 +277,6 @@ export default function ProgressScreen() {
         <HealthTipCard />
       </Animated.View>
     </ScrollView>
+    </SafeAreaView>
   );
 }

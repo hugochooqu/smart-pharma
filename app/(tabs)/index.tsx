@@ -33,21 +33,38 @@ export default function Index() {
       const logs = await fetchIntakeLogs(user.$id);
       const today = new Date().toDateString();
 
-      const valid = allReminders.filter((r: any) => {
+      // Filter valid reminders
+      const validReminders = allReminders.filter((r: any) => {
         const start = new Date(r.startDate);
         const duration = Number(r.durationDays);
         const end = new Date(start);
-        end.setDate(start.getDate() + duration - 1); // subtract 1 for inclusive range
+        end.setDate(start.getDate() + duration - 1);
         end.setHours(23, 59, 59, 999);
 
-        return new Date() >= start && new Date() <= end;
+        return (
+          new Date() >= start &&
+          new Date() <= end &&
+          r.recommendationId &&
+          r.recommendationId !== "custom"
+        );
       });
 
+      // Expand each reminder into individual doses
+      const expanded = validReminders.flatMap((r: any) =>
+        r.times.map((time: string, index: number) => ({
+          ...r,
+          singleTime: time,
+          timeIndex: index,
+          uniqueId: `${r.$id}-${index}`,
+        }))
+      );
+
+      // Find taken doses today
       const takenToday = logs
         .filter((log) => new Date(log.$createdAt).toDateString() === today)
-        .map((log) => log.reminderId);
+        .map((log) => log.reminderId + "-" + log.timeIndex);
 
-      setTodayReminders(valid);
+      setTodayReminders(expanded);
       setTakenIds(takenToday);
     };
 
@@ -121,51 +138,51 @@ export default function Index() {
                   Today’s Medications
                 </Text>
 
-                {todayReminders.map((reminder) => (
-                  <View
-                    key={reminder.$id}
-                    className="mb-4 p-4 rounded-lg bg-blue-50 dark:bg-blue-900"
-                  >
-                    <Text className="text-blue-800 dark:text-white font-semibold">
-                      Frequency: {reminder.frequencyPerDay}x/day
-                    </Text>
-                    <Text className="text-sm text-blue-600 dark:text-blue-300 mb-2">
-                      Times:{" "}
-                      {reminder.times
-                        .map((t: string) =>
-                          new Date(t).toLocaleTimeString([], {
-                            hour: "2-digit",
-                            minute: "2-digit",
-                          })
-                        )
-                        .join(", ")}
-                    </Text>
-                    <Text className="text-sm text-gray-700 dark:text-gray-300 italic mb-3">
-                      Note: {reminder.note || "—"}
-                    </Text>
+                {todayReminders.map((reminder) => {
+                  const takenKey = reminder.uniqueId;
+                  const taken = takenIds.includes(takenKey);
 
-                    <Pressable
-                      onPress={async () => {
-                        if (!user) return;
-                        await saveIntakeLog({
-                          userId: user.$id,
-                          recommendationId: reminder.recommendationId,
-                          reminderId: reminder.$id,
-                        });
-                        setTakenIds((prev) => [...prev, reminder.$id]);
-                      }}
-                      className={`p-3 rounded-md ${
-                        takenIds.includes(reminder.$id)
-                          ? "bg-green-600"
-                          : "bg-blue-600"
-                      }`}
+                  return (
+                    <View
+                      key={takenKey}
+                      className="mb-4 p-4 rounded-lg bg-blue-50 dark:bg-blue-900"
                     >
-                      <Text className="text-white text-center font-bold">
-                        {takenIds.includes(reminder.$id) ? "✅ Taken" : "Take"}
+                      <Text className="text-blue-800 dark:text-white font-semibold">
+                        Time:{" "}
+                        {new Date(reminder.singleTime).toLocaleTimeString([], {
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        })}
                       </Text>
-                    </Pressable>
-                  </View>
-                ))}
+
+                      <Text className="text-sm text-gray-700 dark:text-gray-300 italic mb-3">
+                        Note: {reminder.note || "—"}
+                      </Text>
+
+                      <Pressable
+                        onPress={async () => {
+                          if (!user) return;
+
+                          await saveIntakeLog({
+                            userId: user.$id,
+                            recommendationId: reminder.recommendationId,
+                            reminderId: reminder.$id,
+                            timeIndex: reminder.timeIndex,
+                          });
+
+                          setTakenIds((prev) => [...prev, takenKey]);
+                        }}
+                        className={`p-3 rounded-md ${
+                          taken ? "bg-green-600" : "bg-blue-600"
+                        }`}
+                      >
+                        <Text className="text-white text-center font-bold">
+                          {taken ? "✅ Taken" : "Take"}
+                        </Text>
+                      </Pressable>
+                    </View>
+                  );
+                })}
               </View>
             )}
           </View>

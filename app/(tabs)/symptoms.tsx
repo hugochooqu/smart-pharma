@@ -33,11 +33,8 @@ export default function SymptomsScreen() {
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [customSymptoms, setCustomSymptoms] = useState("");
   const [loading, setLoading] = useState(false);
-  const [recommendation, setRecommendation] = useState<HerbalRecommendation[]>(
-    []
-  );
+  const [recommendation, setRecommendation] = useState<HerbalRecommendation[]>([]);
   const [history, setHistory] = useState<RecommendationHistory[]>([]);
-  const [acceptedIds, setAcceptedIds] = useState<number[]>([]);
 
   const { user } = useAuthStore();
   const userId = user?.$id;
@@ -48,57 +45,40 @@ export default function SymptomsScreen() {
     );
   };
 
+  const buildPrompt = (coreSymptoms: string) => {
+    return `You are a certified Nigerian herbalist.
+
+Given these symptoms: ${coreSymptoms}
+
+Do not include explanations or text, just return one herbal recommendation in **pure JSON** format.
+
+This recommendation can either be:
+- A single herb that works well, OR
+- A blend (mixture) of herbs that work together.
+
+Return only one object, structured like this:
+
+{
+  "herb": "Ginger + Clove + Lemon",
+  "effect": "Helps with cold symptoms, boosts immunity and soothes throat",
+  "dosage": "Boil all together in 500ml water and drink twice daily"
+}
+
+Do NOT wrap in an array or add markdown. Just return this single JSON object.`;
+  };
+
   const handleSubmit = async () => {
     if (selectedTags.length === 0 && customSymptoms.trim() === "") return;
 
     setLoading(true);
 
     const tagString = selectedTags.join(", ");
-    const hasTags = tagString !== "";
-    const hasCustom = customSymptoms.trim() !== "";
+    const coreSymptoms = tagString && customSymptoms
+      ? `${tagString}, and also: ${customSymptoms}`
+      : tagString || customSymptoms;
 
-    let coreSymptoms = "";
-    if (hasTags && hasCustom) {
-      coreSymptoms = `${tagString}, and also: ${customSymptoms}`;
-    } else if (hasTags) {
-      coreSymptoms = tagString;
-    } else {
-      coreSymptoms = customSymptoms;
-    }
-
-    const prompt = `You are a certified nigerian herbalist.
-
-Given the following symptoms: ${coreSymptoms}.
-
-
-Do not include introductions, explanations, or disclaimers. Be straight to the point. 
-
-Provide a list of suitable herbs that are common to find in africa, particularly nigeria with the following structure in **pure JSON array format**. Do not add any text before or after the JSON. Just return raw JSON.
-
-Each herb should be an object with:
-- "herb": name of the herb
-- "effect": 1-2 lines about its benefit
-- "dosage": preparation or dosage instructions
-
-Example format:
-
-[
-  {
-    "herb": "Ginger",
-    "effect": "Reduces inflammation and boosts immunity",
-    "dosage": "1 tsp grated root in hot water, twice daily"
-  },
-  {
-    "herb": "Moringa",
-    "effect": "Supports energy and nutrient levels",
-    "dosage": "2 capsules (500mg) once daily"
-  }
-]
-`;
+    const prompt = buildPrompt(coreSymptoms);
     const result = await getHerbalRecommendation(prompt);
-    console.log("🤖 Raw AI result:", result);
-
-    let parsedResult;
 
     try {
       const cleaned = result
@@ -108,18 +88,16 @@ Example format:
         .replace(/```$/, "")
         .trim();
 
-      parsedResult = JSON.parse(cleaned);
-      console.log("✅ Parsed result:", parsedResult);
-      setRecommendation(parsedResult);
+      const parsed = JSON.parse(cleaned);
+      setRecommendation([parsed]); // Always store as an array for consistent rendering
     } catch (error) {
       console.error("❌ Failed to parse recommendation:", error);
-      console.log("🔍 Raw content:", result);
     }
 
     setLoading(false);
   };
 
-  const handleAcceptOne = async (item: HerbalRecommendation, index: number) => {
+  const handleAcceptOne = async (item: HerbalRecommendation) => {
     try {
       if (!userId) throw new Error("User ID is missing");
 
@@ -127,50 +105,31 @@ Example format:
         userId,
         symptoms: selectedTags,
         customSymptoms,
-        recommendations: JSON.stringify([item]), // Save only 1
+        recommendations: JSON.stringify([item]),
       });
 
-      setAcceptedIds((prev) => [...prev, index]);
+      setRecommendation([]);
+      setSelectedTags([]);
+      setCustomSymptoms('') // Clear current view
 
-      // Remove it from UI
-      setRecommendation((prev) => prev.filter((_, i) => i !== index));
+      const data = await fetchUserRecommendations(userId); // Refresh history
+      setHistory(data);
     } catch (err) {
       console.error("❌ Failed to save one recommendation", err);
     }
   };
 
-  const handleRejectOne = (index: number) => {
-    setRecommendation((prev) => prev.filter((_, i) => i !== index));
-  };
-
-  const handleAcceptAll = async () => {
-    setLoading(true);
-    try {
-      if (!userId) throw new Error("User ID is missing");
-      await saveRecommendations({
-        userId,
-        symptoms: selectedTags,
-        customSymptoms,
-        recommendations: JSON.stringify(recommendation),
-      });
-    } catch (err) {
-      console.error("❌ Failed to save to Appwrite", err);
-    }
-
-    setRecommendation([]);
-    setLoading(false);
-  };
+  const handleReject = () => setRecommendation([]);
 
   useEffect(() => {
-    const loadData = async () => {
-      if (!userId) throw new Error("User ID is missing");
+    const loadHistory = async () => {
+      if (!userId) return;
       const data = await fetchUserRecommendations(userId);
-      console.log(data)
-      setHistory(data); // history = useState([])
+      setHistory(data);
     };
 
-    loadData();
-  }, []);
+    loadHistory();
+  }, [userId]);
 
   return (
     <KeyboardAvoidingView
@@ -178,10 +137,7 @@ Example format:
       style={{ flex: 1 }}
     >
       <SafeAreaView className="flex-1 bg-white dark:bg-slate-900">
-        <ScrollView
-          className="px-4 pt-12 bg-white dark:bg-slate-900"
-          contentContainerStyle={{ paddingBottom: 120 }}
-        >
+        <ScrollView className="px-4 pt-12" contentContainerStyle={{ paddingBottom: 120 }}>
           <Text className="text-xl font-bold mb-4 text-blue-900 dark:text-blue-200">
             Describe your symptoms
           </Text>
@@ -239,9 +195,7 @@ Example format:
             </Text>
           </Pressable>
 
-          {loading && (
-            <ActivityIndicator className="mt-4" size="large" color="#3B82F6" />
-          )}
+          {loading && <ActivityIndicator className="mt-4" size="large" color="#3B82F6" />}
 
           {recommendation.length > 0 && (
             <View className="mt-6 bg-blue-50 dark:bg-gray-800 p-4 rounded-lg pb-20">
@@ -250,10 +204,7 @@ Example format:
               </Text>
 
               {recommendation.map((item, index) => (
-                <View
-                  key={index}
-                  className="mb-4 p-3 bg-white dark:bg-gray-900 rounded-lg shadow"
-                >
+                <View key={index} className="mb-4 p-3 bg-white dark:bg-gray-900 rounded-lg shadow">
                   <Text className="text-blue-900 dark:text-blue-200 font-semibold text-base">
                     🌿 {item.herb}
                   </Text>
@@ -264,31 +215,28 @@ Example format:
                     Dosage: {item.dosage}
                   </Text>
 
-                  <View className="flex-row mt-3 justify-between">
+                  <View className="flex-row mt-3 justify-between flex-wrap gap-2">
                     <Pressable
-                      onPress={() => handleAcceptOne(item, index)}
+                      onPress={() => handleAcceptOne(item)}
                       className="bg-green-500 px-4 py-2 rounded-md"
                     >
                       <Text className="text-white font-medium">Accept</Text>
                     </Pressable>
                     <Pressable
-                      onPress={() => handleRejectOne(index)}
+                      onPress={handleReject}
                       className="bg-red-500 px-4 py-2 rounded-md"
                     >
                       <Text className="text-white font-medium">Reject</Text>
                     </Pressable>
+                    <Pressable
+                      onPress={handleSubmit}
+                      className="bg-yellow-500 px-4 py-2 rounded-md"
+                    >
+                      <Text className="text-white font-medium">Another Option</Text>
+                    </Pressable>
                   </View>
                 </View>
               ))}
-
-              <Pressable
-                onPress={handleAcceptAll}
-                className="bg-blue-600 p-3 mt-6 rounded-lg"
-              >
-                <Text className="text-white text-center font-semibold">
-                  Accept All
-                </Text>
-              </Pressable>
             </View>
           )}
 
@@ -301,26 +249,23 @@ Example format:
                 key={entry.id}
                 className="mb-4 p-3 bg-blue-50 dark:bg-gray-800 rounded-lg"
                 onPress={() =>
-                        router.push({
-                          pathname: "/reminders",
-                          params: { recommendationId: entry.id },
-                        })
-                      }
+                  router.push({
+                    pathname: "/reminders",
+                    params: { recommendationId: entry.id },
+                  })
+                }
               >
                 <Text className="text-blue-900 dark:text-blue-100 font-semibold mb-1">
                   Symptoms: {(entry.symptoms as string[]).join(", ")}
                 </Text>
                 {entry.customSymptoms && (
                   <Text className="text-sm text-blue-700 dark:text-blue-300 mb-2">
-                    Extra: {entry.customSymptoms as string}
+                    Extra: {entry.customSymptoms}
                   </Text>
                 )}
                 {Array.isArray(entry.recommendation) &&
                   entry.recommendation.map((r, i) => (
-                    <View
-                      key={i}
-                      className="mb-2"
-                    >
+                    <View key={i} className="mb-2">
                       <Text className="text-sm font-medium text-blue-800 dark:text-blue-200">
                         🌿 {r.herb}
                       </Text>

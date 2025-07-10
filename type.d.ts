@@ -1,13 +1,14 @@
 import { Models } from "react-native-appwrite";
 
-export interface CustomInputProps {
-    placeholder?: string;
-    value?: string;
-    onChangeText?: (text: string) => void;
-    label: string;
-    secureTextEntry?: boolean;
-    keyboardType?: "default" | "email-address" | "numeric" | "phone-pad";
-}
+export type CustomInputProps = {
+  label?: string;
+  placeholder?: string;
+  value: string;
+  onChangeText: (text: string) => void;
+  secureTextEntry?: boolean;
+  keyboardType?: KeyboardTypeOptions;
+  rightIcon?: React.ReactNode; // 👈 add this
+};
 
 export interface CustomButtonProps {
     onPress?: () => void;
