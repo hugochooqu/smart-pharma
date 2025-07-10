@@ -1,4 +1,4 @@
-import {SplashScreen, Stack} from "expo-router";
+import {Slot, SplashScreen, Stack} from "expo-router";
 import { useFonts } from 'expo-font';
 import { useEffect} from "react";
 import * as Notifications from 'expo-notifications';
@@ -7,6 +7,8 @@ import './global.css';
 import * as Sentry from '@sentry/react-native';
 import useAuthStore from "@/store/auth.store";
 import { registerForPushNotificationsAsync } from "@/utils/notifications";
+import { ThemeProvider } from "@/context/ThemeContext";
+import { useColorScheme } from "react-native";
 
 Sentry.init({
   dsn: 'https://4a6840595bc6e27c282090b9b4570e45@o4508299493179392.ingest.de.sentry.io/4509629506060368',
@@ -26,9 +28,10 @@ Sentry.init({
 
 
 export default Sentry.wrap(function RootLayout() {
-  const {isLoading, fetchAuthenticatedUser} = useAuthStore()
+  const { isLoading, fetchAuthenticatedUser } = useAuthStore();
+  const scheme = useColorScheme();
 
-   const [fontsLoaded, error] = useFonts({
+  const [fontsLoaded, error] = useFonts({
     "QuickSand-Bold": require('../assets/fonts/Quicksand-Bold.ttf'),
     "QuickSand-Medium": require('../assets/fonts/Quicksand-Medium.ttf'),
     "QuickSand-Regular": require('../assets/fonts/Quicksand-Regular.ttf'),
@@ -37,22 +40,28 @@ export default Sentry.wrap(function RootLayout() {
   });
 
   useEffect(() => {
-    if(error) throw error;
-    if(fontsLoaded) SplashScreen.hideAsync();
+    if (error) throw error;
+    if (fontsLoaded) SplashScreen.hideAsync();
   }, [fontsLoaded, error]);
 
   useEffect(() => {
-    fetchAuthenticatedUser()
-  }, [])
+    fetchAuthenticatedUser();
+  }, []);
 
-useEffect(() => {
-  registerForPushNotificationsAsync()
-}, []);
+  useEffect(() => {
+    registerForPushNotificationsAsync();
+  }, []);
+
+  if (!fontsLoaded || isLoading) return null;
 
   
-  if(!fontsLoaded || isLoading ) return null;
 
-  return <Stack screenOptions={{headerShown: false}}>
-            <Stack.Screen name="(tabs)" options={{headerShown: false}} />
-        </Stack>;
+  return (
+    <ThemeProvider>
+      <Stack screenOptions={{ headerShown: false }}>
+        {/* This will render all routes inside /app */}
+        <Stack.Screen name="start" options={{headerShown: false}} />
+      </Stack>
+    </ThemeProvider>
+  );
 });

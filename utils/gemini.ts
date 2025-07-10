@@ -24,3 +24,25 @@ export async function getHerbalRecommendation(prompt: string): Promise<string> {
     return 'Error fetching recommendation.';
   }
 }
+
+export async function fetchHealthTipFromAI(): Promise<string> {
+  const prompt = "Give one short, practical daily health tip in 1-2 sentences.";
+
+  const res = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        contents: [{ parts: [{ text: prompt }] }],
+      }),
+    }
+  );
+
+  const json = await res.json();
+  return (
+    json.candidates?.[0]?.content?.parts?.[0]?.text ||
+    "Take a short walk today to boost your mood and circulation."
+  );
+}
+

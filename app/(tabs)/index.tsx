@@ -1,8 +1,6 @@
 import { colors, quickNav } from "@/constants";
 import {
-  Button,
   FlatList,
-  Image,
   Pressable,
   Text,
   TouchableWithoutFeedback,
@@ -12,20 +10,55 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import useAuthStore from "@/store/auth.store";
+import { useEffect, useState } from "react";
+import {
+  fetchIntakeLogs,
+  fetchRemindersForRecommendation,
+  saveIntakeLog,
+} from "@/lib/appwrite";
+import HealthTipCard from "@/components/HealthTipCard";
 
 export default function Index() {
-  const {user} = useAuthStore();
-  console.log('User:', JSON.stringify(user, null, 2) )
+  const [todayReminders, setTodayReminders] = useState<any[]>([]);
+  const [takenIds, setTakenIds] = useState<string[]>([]);
 
+  const { user } = useAuthStore();
   const router = useRouter();
 
-  const QuickActionCard = ({ id, title, subtitle, icon, color }: any) => {
+  useEffect(() => {
+    const fetchTodayReminders = async () => {
+      if (!user) return;
+
+      const allReminders = await fetchRemindersForRecommendation(user.$id);
+      const logs = await fetchIntakeLogs(user.$id);
+      const today = new Date().toDateString();
+
+      const valid = allReminders.filter((r: any) => {
+        const start = new Date(r.startDate);
+        const duration = Number(r.durationDays);
+        const end = new Date(start);
+        end.setDate(start.getDate() + duration - 1); // subtract 1 for inclusive range
+        end.setHours(23, 59, 59, 999);
+
+        return new Date() >= start && new Date() <= end;
+      });
+
+      const takenToday = logs
+        .filter((log) => new Date(log.$createdAt).toDateString() === today)
+        .map((log) => log.reminderId);
+
+      setTodayReminders(valid);
+      setTakenIds(takenToday);
+    };
+
+    fetchTodayReminders();
+  }, []);
+
+  const QuickActionCard = ({ id, title, subtitle, icon, color, screen }: any) => {
     return (
-      <Pressable className="flex-1 m-2 p-5 bg-white rounded-xl shadow-lg shadow-slate-600 items-center justify-center">
+      <Pressable className="flex-1 m-2 p-5 bg-white dark:bg-neutral-800 rounded-xl shadow-lg shadow-slate-600 items-center justify-center">
         {({ pressed }) => (
-          <TouchableWithoutFeedback
-            onPress={() => router.push("/(tabs)/symptoms")}
-          >
+          <TouchableWithoutFeedback onPress={() => router.push(screen)}>
             <View className="items-center justify-center">
               <View
                 className="w-16 h-16 rounded-full justify-center items-center mb-3"
@@ -33,10 +66,12 @@ export default function Index() {
               >
                 <Ionicons name={icon} size={24} color="white" />
               </View>
-              <Text className="text-gray-900 font-bold text-lg text-center">
+              <Text className="text-gray-900 dark:text-white font-bold text-lg text-center">
                 {title}
               </Text>
-              <Text className="text-gray-700 text-center">{subtitle}</Text>
+              <Text className="text-gray-700 dark:text-white text-center">
+                {subtitle}
+              </Text>
             </View>
           </TouchableWithoutFeedback>
         )}
@@ -45,7 +80,7 @@ export default function Index() {
   };
 
   return (
-    <SafeAreaView className="flex-1 bg-white">
+    <SafeAreaView className="flex-1 bg-white dark:bg-slate-900">
       <FlatList
         data={quickNav}
         keyExtractor={(item) => item.id.toString()}
@@ -56,22 +91,83 @@ export default function Index() {
             subtitle={item.subtitle}
             icon={item.icon}
             color={colors[item.color as keyof typeof colors]}
+            screen={item.screen}
           />
         )}
         numColumns={2}
         contentContainerStyle={{ padding: 8 }}
         ListHeaderComponent={() => (
           <View>
-            <View className="px-4 pt-6 pb-2 flex flex-row justify-between">
-              <Text className=" text-3xl font-semibold">Hello {user?.name}</Text>
-              <Image source={user?.avatar ? {uri: user.avatar} : undefined} className="size-10 rounded-full" resizeMode="contain" />
+            <View className="px-4 pt-6 pb-2 flex flex-row justify-between items-center">
+              <Text className="text-3xl font-semibold text-black dark:text-white">
+                Hello {user?.name}
+              </Text>
             </View>
-            <Text className="px-4 text-lg font-semibold text-gray-400">
+            <Text className="px-4 text-lg font-semibold text-gray-400 dark:text-gray-300">
               Let&apos;s take care of your health today
             </Text>
-            <Text className="text-2xl font-bold text-neutral-600 py-6 px-4">
+            <Text className="text-2xl font-bold text-neutral-600 dark:text-neutral-300 py-6 px-4">
               Quick Actions
             </Text>
+          </View>
+        )}
+        ListFooterComponent={() => (
+          <View className="px-4 pb-20">
+            <HealthTipCard />
+
+            {todayReminders.length > 0 && (
+              <View className="mt-6">
+                <Text className="text-xl font-semibold mb-4 text-blue-700 dark:text-blue-300">
+                  Today’s Medications
+                </Text>
+
+                {todayReminders.map((reminder) => (
+                  <View
+                    key={reminder.$id}
+                    className="mb-4 p-4 rounded-lg bg-blue-50 dark:bg-blue-900"
+                  >
+                    <Text className="text-blue-800 dark:text-white font-semibold">
+                      Frequency: {reminder.frequencyPerDay}x/day
+                    </Text>
+                    <Text className="text-sm text-blue-600 dark:text-blue-300 mb-2">
+                      Times:{" "}
+                      {reminder.times
+                        .map((t: string) =>
+                          new Date(t).toLocaleTimeString([], {
+                            hour: "2-digit",
+                            minute: "2-digit",
+                          })
+                        )
+                        .join(", ")}
+                    </Text>
+                    <Text className="text-sm text-gray-700 dark:text-gray-300 italic mb-3">
+                      Note: {reminder.note || "—"}
+                    </Text>
+
+                    <Pressable
+                      onPress={async () => {
+                        if (!user) return;
+                        await saveIntakeLog({
+                          userId: user.$id,
+                          recommendationId: reminder.recommendationId,
+                          reminderId: reminder.$id,
+                        });
+                        setTakenIds((prev) => [...prev, reminder.$id]);
+                      }}
+                      className={`p-3 rounded-md ${
+                        takenIds.includes(reminder.$id)
+                          ? "bg-green-600"
+                          : "bg-blue-600"
+                      }`}
+                    >
+                      <Text className="text-white text-center font-bold">
+                        {takenIds.includes(reminder.$id) ? "✅ Taken" : "Take"}
+                      </Text>
+                    </Pressable>
+                  </View>
+                ))}
+              </View>
+            )}
           </View>
         )}
       />

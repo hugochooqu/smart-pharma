@@ -6,12 +6,15 @@ import {
   Pressable,
   ScrollView,
   ActivityIndicator,
+  KeyboardAvoidingView,
+  Platform,
 } from "react-native";
 import { getHerbalRecommendation } from "@/utils/gemini";
 import { fetchUserRecommendations, saveRecommendations } from "@/lib/appwrite";
 import useAuthStore from "@/store/auth.store";
 import { HerbalRecommendation, RecommendationHistory } from "@/type";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { router } from "expo-router";
 
 const commonSymptoms = [
   "Headache",
@@ -30,7 +33,9 @@ export default function SymptomsScreen() {
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [customSymptoms, setCustomSymptoms] = useState("");
   const [loading, setLoading] = useState(false);
-  const [recommendation, setRecommendation] = useState<HerbalRecommendation[]>([]);
+  const [recommendation, setRecommendation] = useState<HerbalRecommendation[]>(
+    []
+  );
   const [history, setHistory] = useState<RecommendationHistory[]>([]);
   const [acceptedIds, setAcceptedIds] = useState<number[]>([]);
 
@@ -61,14 +66,14 @@ export default function SymptomsScreen() {
       coreSymptoms = customSymptoms;
     }
 
-    const prompt = `You are a certified herbalist.
+    const prompt = `You are a certified nigerian herbalist.
 
 Given the following symptoms: ${coreSymptoms}.
 
 
 Do not include introductions, explanations, or disclaimers. Be straight to the point. 
 
-Provide a list of suitable herbs with the following structure in **pure JSON array format**. Do not add any text before or after the JSON. Just return raw JSON.
+Provide a list of suitable herbs that are common to find in africa, particularly nigeria with the following structure in **pure JSON array format**. Do not add any text before or after the JSON. Just return raw JSON.
 
 Each herb should be an object with:
 - "herb": name of the herb
@@ -115,30 +120,28 @@ Example format:
   };
 
   const handleAcceptOne = async (item: HerbalRecommendation, index: number) => {
-  try {
-    if (!userId) throw new Error("User ID is missing");
+    try {
+      if (!userId) throw new Error("User ID is missing");
 
-    await saveRecommendations({
-      userId,
-      symptoms: selectedTags,
-      customSymptoms,
-      recommendations: JSON.stringify([item]), // Save only 1
-    });
+      await saveRecommendations({
+        userId,
+        symptoms: selectedTags,
+        customSymptoms,
+        recommendations: JSON.stringify([item]), // Save only 1
+      });
 
-    setAcceptedIds((prev) => [...prev, index]);
+      setAcceptedIds((prev) => [...prev, index]);
 
-    // Remove it from UI
+      // Remove it from UI
+      setRecommendation((prev) => prev.filter((_, i) => i !== index));
+    } catch (err) {
+      console.error("❌ Failed to save one recommendation", err);
+    }
+  };
+
+  const handleRejectOne = (index: number) => {
     setRecommendation((prev) => prev.filter((_, i) => i !== index));
-  } catch (err) {
-    console.error("❌ Failed to save one recommendation", err);
-  }
-};
-
-const handleRejectOne = (index: number) => {
-  setRecommendation((prev) => prev.filter((_, i) => i !== index));
-};
-
-
+  };
 
   const handleAcceptAll = async () => {
     setLoading(true);
@@ -162,6 +165,7 @@ const handleRejectOne = (index: number) => {
     const loadData = async () => {
       if (!userId) throw new Error("User ID is missing");
       const data = await fetchUserRecommendations(userId);
+      console.log(data)
       setHistory(data); // history = useState([])
     };
 
@@ -169,139 +173,170 @@ const handleRejectOne = (index: number) => {
   }, []);
 
   return (
-    <SafeAreaView className="flex-1 bg-white">
-    <ScrollView className="px-4 pt-12 bg-white h-full" contentContainerStyle={{ paddingBottom: 120 }}>
-      <Text className="text-xl font-bold mb-4 text-blue-900">
-        Describe your symptoms
-      </Text>
-
-      {/* Structured Tags */}
-      <Text className="mb-2 text-blue-800 font-medium">
-        Select common symptoms:
-      </Text>
-      <View className="flex-row flex-wrap mb-6">
-        {commonSymptoms.map((symptom, index) => (
-          <Pressable
-            key={index}
-            onPress={() => toggleTag(symptom)}
-            className={`px-3 py-1 m-1 rounded-full border ${
-              selectedTags.includes(symptom)
-                ? "bg-blue-500 border-blue-600"
-                : "bg-white border-blue-300"
-            }`}
-          >
-            <Text
-              className={`text-sm ${
-                selectedTags.includes(symptom) ? "text-white" : "text-blue-700"
-              }`}
-            >
-              {symptom}
-            </Text>
-          </Pressable>
-        ))}
-      </View>
-
-      {/* Free-form Input */}
-      <Text className="text-blue-800 font-medium mb-1">
-        Add more detail (optional):
-      </Text>
-      <TextInput
-        className="border border-blue-400 p-4 rounded-md mb-4 h-32 text-base"
-        multiline
-        value={customSymptoms}
-        onChangeText={setCustomSymptoms}
-        placeholder="E.g. I've had persistent muscle soreness for over a week..."
-      />
-
-      {/* Submit */}
-      <Pressable
-        disabled={selectedTags.length === 0 && customSymptoms.trim() === ""}
-        className={`p-3 rounded-md ${
-          selectedTags.length === 0 && customSymptoms.trim() === ""
-            ? "bg-gray-400"
-            : "bg-blue-600"
-        }`}
-        onPress={handleSubmit}
-      >
-        <Text className="text-white text-center font-semibold">
-          Get Recommendation
-        </Text>
-      </Pressable>
-
-      {/* Spinner */}
-      {loading && (
-        <ActivityIndicator className="mt-4" size="large" color="#3B82F6" />
-      )}
-
-      {/* AI Output */}
-      {recommendation.length > 0 && (
-  <View className="mt-6 bg-blue-50 p-4 rounded-lg pb-20">
-    <Text className="text-lg font-medium mb-4 text-blue-800">
-      AI Herbal Blend:
-    </Text>
-
-    {recommendation.map((item, index) => (
-      <View key={index} className="mb-4 p-3 bg-white rounded-lg shadow">
-        <Text className="text-blue-900 font-semibold text-base">
-          🌿 {item.herb}
-        </Text>
-        <Text className="text-sm text-gray-700">Effect: {item.effect}</Text>
-        <Text className="text-sm text-gray-700">Dosage: {item.dosage}</Text>
-
-        <View className="flex-row mt-3 justify-between">
-          <Pressable
-            onPress={() => handleAcceptOne(item, index)}
-            className="bg-green-500 px-4 py-2 rounded-md"
-          >
-            <Text className="text-white font-medium">Accept</Text>
-          </Pressable>
-          <Pressable
-            onPress={() => handleRejectOne(index)}
-            className="bg-red-500 px-4 py-2 rounded-md"
-          >
-            <Text className="text-white font-medium">Reject</Text>
-          </Pressable>
-        </View>
-      </View>
-    ))}
-
-    <Pressable
-      onPress={handleAcceptAll}
-      className="bg-blue-600 p-3 mt-6 rounded-lg"
+    <KeyboardAvoidingView
+      behavior={Platform.OS === "ios" ? "padding" : undefined}
+      style={{ flex: 1 }}
     >
-      <Text className="text-white text-center font-semibold">Accept All</Text>
-    </Pressable>
-  </View>
-)}
-
-  <View className="pt-6">
-    <Text className="text-xl font-semibold py-4 text-blue-900 ">Recommendations:</Text>
-      {history.map((entry) => (
-        <View key={entry.id} className="mb-4 p-3 bg-blue-50 rounded-lg">
-          <Text className="text-blue-900 font-semibold mb-1">
-            Symptoms: {(entry.symptoms as string[]).join(", ")}
+      <SafeAreaView className="flex-1 bg-white dark:bg-slate-900">
+        <ScrollView
+          className="px-4 pt-12 bg-white dark:bg-slate-900"
+          contentContainerStyle={{ paddingBottom: 120 }}
+        >
+          <Text className="text-xl font-bold mb-4 text-blue-900 dark:text-blue-200">
+            Describe your symptoms
           </Text>
-          {entry.customSymptoms && (
-            <Text className="text-sm text-blue-700 mb-2">
-              Extra: {entry.customSymptoms as string}
-            </Text>
-          )}
-          {Array.isArray(entry.recommendation) &&
-            entry.recommendation.map((r: HerbalRecommendation, i: number) => (
-              <View key={i} className="mb-2">
-                <Text className="text-sm font-medium">🌿 {r.herb}</Text>
-                <Text className="text-xs text-gray-700">
-                  Effect: {r.effect}
+
+          <Text className="mb-2 text-blue-800 dark:text-blue-300 font-medium">
+            Select common symptoms:
+          </Text>
+          <View className="flex-row flex-wrap mb-6">
+            {commonSymptoms.map((symptom, index) => (
+              <Pressable
+                key={index}
+                onPress={() => toggleTag(symptom)}
+                className={`px-3 py-1 m-1 rounded-full border ${
+                  selectedTags.includes(symptom)
+                    ? "bg-blue-500 border-blue-600"
+                    : "bg-gray-100 dark:bg-gray-800 border-blue-300"
+                }`}
+              >
+                <Text
+                  className={`text-sm ${
+                    selectedTags.includes(symptom)
+                      ? "text-white"
+                      : "text-blue-700 dark:text-blue-300"
+                  }`}
+                >
+                  {symptom}
                 </Text>
-                <Text className="text-xs text-gray-700">
-                  Dosage: {r.dosage}
-                </Text>
-              </View>
+              </Pressable>
             ))}
-        </View>
-      ))}
-      </View>
-    </ScrollView>
-  </SafeAreaView>
+          </View>
+
+          <Text className="text-blue-800 dark:text-blue-300 font-medium mb-1">
+            Add more detail (optional):
+          </Text>
+          <TextInput
+            className="border border-blue-400 dark:border-blue-300 p-4 rounded-md mb-4 h-32 text-base text-black dark:text-white bg-white dark:bg-gray-900"
+            multiline
+            value={customSymptoms}
+            onChangeText={setCustomSymptoms}
+            placeholder="E.g. I've had persistent muscle soreness for over a week..."
+            placeholderTextColor="#888"
+          />
+
+          <Pressable
+            disabled={selectedTags.length === 0 && customSymptoms.trim() === ""}
+            className={`p-3 rounded-md ${
+              selectedTags.length === 0 && customSymptoms.trim() === ""
+                ? "bg-gray-400"
+                : "bg-blue-600"
+            }`}
+            onPress={handleSubmit}
+          >
+            <Text className="text-white text-center font-semibold">
+              Get Recommendation
+            </Text>
+          </Pressable>
+
+          {loading && (
+            <ActivityIndicator className="mt-4" size="large" color="#3B82F6" />
+          )}
+
+          {recommendation.length > 0 && (
+            <View className="mt-6 bg-blue-50 dark:bg-gray-800 p-4 rounded-lg pb-20">
+              <Text className="text-lg font-medium mb-4 text-blue-800 dark:text-blue-300">
+                AI Herbal Blend:
+              </Text>
+
+              {recommendation.map((item, index) => (
+                <View
+                  key={index}
+                  className="mb-4 p-3 bg-white dark:bg-gray-900 rounded-lg shadow"
+                >
+                  <Text className="text-blue-900 dark:text-blue-200 font-semibold text-base">
+                    🌿 {item.herb}
+                  </Text>
+                  <Text className="text-sm text-gray-700 dark:text-gray-300">
+                    Effect: {item.effect}
+                  </Text>
+                  <Text className="text-sm text-gray-700 dark:text-gray-300">
+                    Dosage: {item.dosage}
+                  </Text>
+
+                  <View className="flex-row mt-3 justify-between">
+                    <Pressable
+                      onPress={() => handleAcceptOne(item, index)}
+                      className="bg-green-500 px-4 py-2 rounded-md"
+                    >
+                      <Text className="text-white font-medium">Accept</Text>
+                    </Pressable>
+                    <Pressable
+                      onPress={() => handleRejectOne(index)}
+                      className="bg-red-500 px-4 py-2 rounded-md"
+                    >
+                      <Text className="text-white font-medium">Reject</Text>
+                    </Pressable>
+                  </View>
+                </View>
+              ))}
+
+              <Pressable
+                onPress={handleAcceptAll}
+                className="bg-blue-600 p-3 mt-6 rounded-lg"
+              >
+                <Text className="text-white text-center font-semibold">
+                  Accept All
+                </Text>
+              </Pressable>
+            </View>
+          )}
+
+          <View className="pt-6">
+            <Text className="text-xl font-semibold py-4 text-blue-900 dark:text-blue-200">
+              Recommendations:
+            </Text>
+            {history.map((entry) => (
+              <Pressable
+                key={entry.id}
+                className="mb-4 p-3 bg-blue-50 dark:bg-gray-800 rounded-lg"
+                onPress={() =>
+                        router.push({
+                          pathname: "/reminders",
+                          params: { recommendationId: entry.id },
+                        })
+                      }
+              >
+                <Text className="text-blue-900 dark:text-blue-100 font-semibold mb-1">
+                  Symptoms: {(entry.symptoms as string[]).join(", ")}
+                </Text>
+                {entry.customSymptoms && (
+                  <Text className="text-sm text-blue-700 dark:text-blue-300 mb-2">
+                    Extra: {entry.customSymptoms as string}
+                  </Text>
+                )}
+                {Array.isArray(entry.recommendation) &&
+                  entry.recommendation.map((r, i) => (
+                    <View
+                      key={i}
+                      className="mb-2"
+                    >
+                      <Text className="text-sm font-medium text-blue-800 dark:text-blue-200">
+                        🌿 {r.herb}
+                      </Text>
+                      <Text className="text-xs text-gray-700 dark:text-gray-300">
+                        Effect: {r.effect}
+                      </Text>
+                      <Text className="text-xs text-gray-700 dark:text-gray-300">
+                        Dosage: {r.dosage}
+                      </Text>
+                    </View>
+                  ))}
+              </Pressable>
+            ))}
+          </View>
+        </ScrollView>
+      </SafeAreaView>
+    </KeyboardAvoidingView>
   );
 }

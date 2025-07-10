@@ -64,3 +64,13 @@ type RecommendationHistory = {
   createdAt: any;
   recommendation: any;
 };
+
+type Reminder = {
+  $id: string;
+  frequencyPerDay: number;
+  times: string[];
+  note: string;
+  startDate: string;
+  durationDays: number;
+  recommendationId: string;
+};

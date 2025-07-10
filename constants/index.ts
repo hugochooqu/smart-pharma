@@ -4,14 +4,16 @@ export const quickNav = [
         title: 'Check Symptoms',
         subtitle: "Input your symptoms",
         icon: 'medical-outline',
-        color: 'primary'
+        color: 'primary',
+        screen: "/(tabs)/symptoms",
     },
     {
         id: 2,
         title: 'View Progress',
         subtitle: "Track your health",
         icon: 'trending-up-outline',
-        color: 'success'
+        color: 'success',
+        screen: "/(tabs)/progress",
 
     },
     {
@@ -19,17 +21,17 @@ export const quickNav = [
         title: 'Set Reminders',
         subtitle: "Never miss a dose",
         icon: 'notifications-outline',
-        color: 'warning'
-
+        color: 'warning',
+        screen: "/(tabs)/reminders",
     },
     {
-        id: 4,
-        title: 'Get Recommendations',
-        subtitle: "Personalised medicine",
-        icon: 'flask-outline',
-        color: 'info'
-
-    }
+    id: 4,
+    title: "Edit Profile",
+    subtitle: "Personal info",
+    icon: "person-outline",
+    color: "info",
+    screen: "/edit-profile", // dynamic route, not inside tabs
+  },
 ]
 
 export const colors= {

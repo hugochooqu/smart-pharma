@@ -9,7 +9,10 @@ export const appwriteConfig = {
     projectId: process.env.EXPO_PUBLIC_APPWRITE_PROJECT_ID,
     databaseId: '686c0fe60000aebacaea',
     userCollectionId: '686c10240013756c46dc',
-    recommendationsCollectionId: '686d4e810008572ad031'
+    recommendationsCollectionId: '686d4e810008572ad031',
+    remindersId: '686e985400089d01b766',
+    medicationId: '686e99d20004d92c7c4f',
+    intakeLogId: '686ebbcd000c40fc8705'
 }
 
 export const client = new Client()
@@ -126,3 +129,179 @@ export async function fetchUserRecommendations(userId: string) {
     return [];
   }
 }
+
+export const updateUserProfile = async ({
+  userId,
+  name,
+  age,
+  weight,
+  height,
+  avatar,
+}: {
+  userId: string;
+  name: string;
+  age: number;
+  weight: number;
+  height: number;
+  avatar: string | null;
+}) => {
+//   let avatarUrl = avatar;
+
+  // upload if it's a local file (not a URL)
+//   if (avatar && avatar.startsWith("file://")) {
+//     const file = await fetch(avatar);
+//     const blob = await file.blob();
+//     const uploaded = await storage.createFile(
+//       appwriteConfig.bucketId,
+//       ID.unique(),
+//       blob
+//     );
+//     avatarUrl = storage.getFileView(appwriteConfig.bucketId, uploaded.$id).href;
+//   }
+
+  await databases.updateDocument(
+    appwriteConfig.databaseId,
+    appwriteConfig.userCollectionId,
+    userId,
+    {
+      name,
+      age,
+      weight,
+      height,
+      avatar
+    }
+  );
+};
+
+export const saveReminder = async ({
+  userId,
+  recommendationId,
+  note,
+  frequencyPerDay,
+  times,
+  durationDays,
+  startDate,
+}: {
+  userId: string;
+  recommendationId: string;
+  note: string;
+  frequencyPerDay: number;
+  times: string[];
+  durationDays: number;
+  startDate: Date;
+}) => {
+  return await databases.createDocument(
+    appwriteConfig.databaseId,
+    appwriteConfig.remindersId,
+    ID.unique(),
+    {
+      userId,
+      recommendationId,
+      note,
+      frequencyPerDay,
+      times,
+      durationDays,
+      startDate,
+      active: true,
+    }
+  );
+};
+
+export const logMedicationTaken = async ({
+  userId,
+  recommendationId,
+  note = '',
+}: {
+  userId: string;
+  recommendationId: string;
+  note?: string;
+}) => {
+  return await databases.createDocument(
+    appwriteConfig.databaseId,
+    appwriteConfig.medicationId,
+    ID.unique(),
+    {
+      userId,
+      recommendationId,
+      timestamp: new Date().toISOString(),
+      note,
+    }
+  );
+};
+
+export const fetchRemindersForRecommendation = async (
+  userId: string,
+  
+) => {
+  const response = await databases.listDocuments(
+    appwriteConfig.databaseId,
+    appwriteConfig.remindersId,
+    [
+      Query.equal('userId', userId),
+    ]
+  );
+
+  return response.documents ;
+};
+
+
+export const saveIntakeLog = async ({
+  userId,
+  reminderId,
+  recommendationId,
+}: {
+  userId: string;
+  reminderId: string;
+  recommendationId: string;
+}) => {
+  return await databases.createDocument(
+    appwriteConfig.databaseId,
+    appwriteConfig.intakeLogId, // collection
+    ID.unique(),
+    {
+      userId,
+      reminderId,
+      recommendationId,
+      takenAt: new Date().toISOString(),
+    }
+  );
+};
+
+export const fetchIntakeLogs = async (userId: string) => {
+  try {
+    const response = await databases.listDocuments(
+      appwriteConfig.databaseId,
+      appwriteConfig.intakeLogId, // your collectionId
+      [Query.equal("userId", userId)]
+    );
+    return response.documents;
+  } catch (error) {
+    console.error("❌ Failed to fetch intake logs:", error);
+    return [];
+  }
+};
+
+export const fetchActiveReminders = async (userId: string) => {
+  try {
+    const response = await databases.listDocuments(
+      appwriteConfig.databaseId,
+      appwriteConfig.remindersId,
+      [Query.equal("userId", userId)]
+    );
+
+    const today = new Date();
+
+    const activeReminders = response.documents.filter((reminder: any) => {
+      const start = new Date(reminder.startDate);
+      const end = new Date(start);
+      end.setDate(start.getDate() + Number(reminder.durationDays));
+
+      return today >= start && today <= end;
+    });
+
+    return activeReminders;
+  } catch (error) {
+    console.error("Error fetching reminders:", error);
+    return [];
+  }
+};
