@@ -25,8 +25,8 @@ SmartPharma uses a modular architecture with:
 - AI layer for symptom analysis and recommendations
 
 ## Screenshots
-![Symptom Screen](./assets/images/screenshot 1.jpg)
-![Home Screen](./assets/images/screenshot 2.jpg)
+![Symptom Screen](./assets/images/screenshot%201.jpg)
+![Home Screen](./assets/images/screenshot%202.jpg)
 
 ## Status
 This project is actively being developed as a production-ready MVP.
